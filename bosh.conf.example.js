@@ -46,7 +46,7 @@ exports.config = {
 	// See this link for details:
 	// http://code.google.com/p/node-xmpp-bosh/issues/detail?id=11
 	// 
-	no_tls_domains: [ 'localhost', 'ttkz-mbp.local', '127.0.0.1' /* 'chat.facebook.com' */ ], 
+	no_tls_domains: [ /* 'chat.facebook.com' */ ], 
 
 
     // Set to 'true' if you want:

@@ -13,10 +13,12 @@ var log       = logger.getLogger(filename);
 function APNProvider(bosh_server) {
 
     this.sessions = [ ];
+    this.devices = {};
 
     this.config = {
         register_path : /^\/register(\/+)?$/,
         unregister_path : /^\/unregister(\/+)?$/,
+        set_badge_path : /^\/set-badge(\/+)?$/,
         port : 2020,
         address : '0.0.0.0'
     };
@@ -26,6 +28,46 @@ function APNProvider(bosh_server) {
             sprintf('ERROR on listener at endpoint: http://%s:%s%s',
                 options.host, options.port, options.path)
         );
+    }
+    
+    function handle_set_badge_request(req, res, u) {
+        var ppos = u.pathname.search(this.config.set_badge_path);
+        if (ppos === -1) {
+            return;
+        }
+        
+        var req_parts = '';
+
+        var on_end = function() {
+            var req = {};
+            var invalid_req = function () {
+                res.end('Invalid request.');
+            };
+
+            try {
+                req = JSON.parse(req_parts);
+            } catch(e) {
+                log.error("Exception : %s, while parsing %s", e, req_parts);
+                invalid_req();
+                return false;
+            }
+
+            if (typeof req.sid === 'undefined') {
+                invalid_req();
+                return false;
+            }
+            
+            this._set_badge(req);
+        }.bind(this);
+
+        req.on('data', function (d) {
+            req_parts += d.toString();
+        })
+        .on('end', function () {
+            on_end();
+        });
+
+        return false;
     }
 
     function handle_register_request(req, res, u) {
@@ -148,11 +190,12 @@ function APNProvider(bosh_server) {
     var router = new EventPipe();
     router.on('request', handle_register_request.bind(this), 1)
         .on('request', handle_unregister_request.bind(this), 2)
-        .on('request', handle_unhandled_request.bind(this), 3)
+        .on('request', handle_set_badge_request.bind(this), 3)
+        .on('request', handle_unhandled_request.bind(this), 4)
 
     function http_request_handler(req, res) {
         var u = url.parse(req.url, true);
-        log.trace("Processing %s request at location: %s", req.method, u.pathname);
+        log.debug("Processing %s request at location: %s", req.method, u.pathname);
         router.emit('request', req, res, u);
     }
 
@@ -164,25 +207,45 @@ function APNProvider(bosh_server) {
 
     server.listen(port, address);
 
-    log.trace("APNS notifier server on : http://%s:%s", address, port);
+    console.log("APNS notifier server on : http://%s:%s", address, port);
 }
 
 APNProvider.prototype = {
     _add_sid : function (sid, info) {
-        log.trace('Adding sid : %s', JSON.stringify(info));
-        if (info['device-token']) {
+        log.debug('Adding sid : %s', JSON.stringify(info));
+        var token = info['device-token'];
+        if (token) {
             this.sessions[sid] = info;
             added = true;
+
+            if (this.devices[token]) {
+                var previous_sid = this.devices[token];
+                this._remove_sid(previous_sid);
+            }
+
+            this.devices[token] = sid;
+
         } else {
-            log.trace('No device-token');
+            log.debug('No device-token');
             added = false;
         }
+
         return added;
     },
 
     _remove_sid: function (sid) {
-        log.trace('Removing sid: %s', sid)
+        log.debug('Removing sid: %s', sid)
         delete this.sessions[sid];
+    },
+    
+    _set_badge: function(info) {
+        var session = this.sessions[info.sid];
+        if (session) {
+            var message = {
+                badge: info.badge
+            }
+            this.pushNote(session['device-token'], message);
+        }
     },
 
     response_received : function (stanza, stream) {
@@ -193,36 +256,61 @@ APNProvider.prototype = {
                 // with body
                 var body = stanza.getChild('body');
                 if (body) {
-                    log.trace("Should notify message: %s", body.t());
-                    return;
-                    var dest_device = new apns.Device(info['device-token']);
+                    log.debug("Should notify message: %s", body.text());
+                    
+                    var message_count = 0;
 
-                    var options = {
-                        cert: 'cert.pem',                 /* Certificate file */
-                        certData: null,                   /* Optional: if supplied uses this instead of Certificate File */
-                        key:  'key.pem',                  /* Key file */
-                        keyData: null,                    /* Optional: if supplied uses this instead of Key file */
-                        passphrase: null,                 /* Optional: A passphrase for the Key file */
-                        gateway: 'gateway.push.apple.com',/* gateway address */
-                        port: 2195,                       /* gateway port */
-                        enhanced: true,                   /* enable enhanced format */
-                        errorCallback: undefined,         /* Callback when error occurs */
-                        cacheLength: 5                    /* Number of notifications to cache for error purposes */
+                    stream.session.pending_stanzas[stream.name].forEach(function (stanza) {
+                        if (stanza.is('message') && stanza.getChild('body')) {
+                            message_count++;
+                        }
+                    });
+                    
+                    var message = {
+                        alert: body.text(),
+                        badge: message_count,
+                        payload: {
+                            from: stanza.attr('from'),
+                            to: stanza.attr('to')
+                        }
                     };
-
-                    var apnsConnection = new apns.Connection(options);
-
-                    var message = new apns.Notification();
-
-                    message.badge = 1;
-                    message.sound = "ping.aiff";
-                    message.alert = body.t();
-                    message.device = dest_device;
-
-                    apnsConnection.sendNotification(message);
+                    this.pushNote(info['device-token'], message);
                 }
             }
         }
+    },
+    
+    pushNote: function(token, aMessage) {
+        log.debug('Pushing a note')
+        var dest_device = new apns.Device(token);
+
+        var options = {
+            cert: __dirname + '/../apns-dev-cert.pem',    /* Certificate file */
+            certData: null,                         /* Optional: if supplied uses this instead of Certificate File */
+            key:  __dirname + '/../apns-dev-key.pem',     /* Key file */
+            keyData: null,                          /* Optional: if supplied uses this instead of Key file */
+            passphrase: '1234',                     /* Optional: A passphrase for the Key file */
+            gateway: 'gateway.sandbox.push.apple.com', /* gateway address */
+            port: 2195,                             /* gateway port */
+            enhanced: true,                         /* enable enhanced format */
+            errorCallback: function(code, note) {
+                log.debug("Failed to send push: code = %i", code);
+                },               /* Callback when error occurs */
+            cacheLength: 5                          /* Number of notifications to cache for error purposes */
+        };
+
+        var apnsConnection = new apns.Connection(options);
+
+        var message = new apns.Notification();
+        
+        message.badge = aMessage.badge;
+        message.sound = "ping.aiff";
+        message.payload = aMessage.payload;
+        message.alert = aMessage.alert;
+        message.device = dest_device;
+
+        var ret = apnsConnection.sendNotification(message);
+        log.debug("Push sent: %d", ret);
     },
 
     stream_terminated : function (stream) {
