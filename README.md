@@ -79,6 +79,8 @@ Note: The **=** sign is important here. Replacing the equal sign with a space wi
 
 * **host**: The host to listen on **(default: 0.0.0.0)**
 
+* **logging**: The logging level to start the BOSH server with **(default: INFO)**. Options: ALL, TRACE, DEBUG, INFO, WARN, ERROR, FATAL, OFF.
+
 * **max_data_held**: The maximum allowable number of bytes that a POST request body may contain. Any request exceeding this value will be dropped **(default: 100000)**
 
 * **max_xmpp_stanza_size**: The maximum size of an incoming XMPP
@@ -262,7 +264,8 @@ if the *callback=* GET query parameter is supplied.
     2. [JSJaC] (https://github.com/sstrigler/JSJaC) used at [jappix.org](http://jappix.org/)
     3. [dojox.xmpp] (http://dojoapi-mirror.devs.nu/jsdoc/dojox/1.2/dojox.xmpp) (modified since node-xmpp-bosh doesn't support the authid attribute)
     4. libpurple (pidgin as a client)
-    5. [strophe.js websocket client] (https://github.com/superfeedr/strophejs/)
+    5. [strophe.js websocket client] (https://github.com/superfeedr/strophejs/tree/protocol-ed)
+    6. [node-xmpp] (https://github.com/astro/node-xmpp)
 
 
 ### Tested using

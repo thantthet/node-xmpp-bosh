@@ -254,7 +254,7 @@ function sprintf(fmt_str) {
 
 function ToStringPromise(proc, args) {
 	this._proc = proc;
-	this._args = args;
+	this._args = args || [ ];
 }
 
 ToStringPromise.prototype = {
@@ -270,6 +270,35 @@ function sprintfd() {
 	return new ToStringPromise(sprintf, arguments);
 }
 
+function replace_promise(s, victim, replacement) {
+    return new ToStringPromise(function() {
+        if (typeof(s) !== "string") {
+            s = String(s);
+        }
+        var re = victim;
+        if (typeof(victim) === 'string') {
+            re = new RegExp(victim, 'g');
+        }
+        return s.replace(re, replacement);
+    });
+}
+
+var TRIM_DEFAULT_LENGTH = 80;
+
+function trim_promise(s, len) {
+    return new ToStringPromise(function() {
+        len = len || TRIM_DEFAULT_LENGTH;
+        len = len < 0 || len > TRIM_DEFAULT_LENGTH ? TRIM_DEFAULT_LENGTH : len;
+        if (typeof(s) !== "string") {
+            s = String(s);
+        }
+        if (s.length <= len) {
+            return s;
+        }
+        var diff = s.length - len;
+        return String(s).substr(0, len) + "... [" + diff + " more " + pluralize(diff, "character") + "]";
+    }, [ ]);
+}
 
 function not(proc) {
 	return function() {
@@ -542,4 +571,6 @@ exports.find_module        = find_module;
 exports.require_again      = require_again;
 exports.pluralize          = pluralize;
 exports.inflated_attrs     = inflated_attrs;
+exports.trim_promise       = trim_promise;
+exports.replace_promise    = replace_promise;
 exports.NULL_FUNC          = function() { };

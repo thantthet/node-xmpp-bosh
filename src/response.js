@@ -52,7 +52,7 @@ Response.prototype = {
         }
 	},
 
-    set_error: function (error_func) {
+    set_error_handler: function (error_func) {
 		this._res.on('error', error_func);
     },
 
@@ -66,16 +66,16 @@ Response.prototype = {
 
 	// Allow Cross-Domain access
 	// https://developer.mozilla.org/En/HTTP_access_control
-	send_response: function (msg, no_error_handler) {
+	send_response: function (msg, do_not_attach_error_handler) {
 		// To prevent an unhandled exception later
-		if (!no_error_handler) {
-            this.set_error(NULL_FUNC);
+		if (!do_not_attach_error_handler) {
+            this.set_error_handler(NULL_FUNC);
         }
         // According to the spec. we need to send a Content-Length header
         this._res.setHeader("Content-Length", Buffer.byteLength(msg, 'utf8'));
 		this._res.writeHead(200, this._options.HTTP_POST_RESPONSE_HEADERS);
 		this._res.end(msg);
-		log.debug("%s SENT(%s): %s", this._sid, this.rid, msg);
+		log.debug("%s SENT(%s): %s", this._sid, this.rid, dutil.replace_promise(dutil.trim_promise(msg), '\n', ' '));
 	},
 
 	// If a client closes a connection and a response to that HTTP request
