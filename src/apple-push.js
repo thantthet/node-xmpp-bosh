@@ -5,6 +5,7 @@ var path      = require('path');
 var EventPipe = require('eventpipe').EventPipe;
 var ltx       = require('ltx');
 var apns      = require('apn');
+var Buffer    = require('buffer').Buffer;
 
 var filename  = "[" + path.basename(path.normalize(__filename)) + "]";
 var logger    = require('./log.js');
@@ -304,10 +305,17 @@ APNProvider.prototype = {
         var message = new apns.Notification();
         
         message.badge = aMessage.badge;
-        message.sound = "ping.aiff";
+        message.sound = "new_message_tone.caf";
         message.payload = aMessage.payload;
         message.alert = aMessage.alert;
         message.device = dest_device;
+        
+        payloadLength = Buffer.byteLength(JSON.stringify(message), 'utf8');
+        if (payloadLength > 256) {
+            reduceLength = payloadLength - 256;
+            buffer = new Buffer(aMessage.alert, 'utf8');
+            message.alert = buffer.toString('utf8', 0, buffer.length - reduceLength);
+        }
 
         var ret = apnsConnection.sendNotification(message);
         log.debug("Push sent: %d", ret);
