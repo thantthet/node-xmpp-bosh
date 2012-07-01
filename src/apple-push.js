@@ -1,4 +1,5 @@
 var bosh      = require('./bosh.js');
+var opt       = require('./options.js');
 var http      = require('http');
 var url       = require('url');
 var path      = require('path');
@@ -11,12 +12,14 @@ var filename  = "[" + path.basename(path.normalize(__filename)) + "]";
 var logger    = require('./log.js');
 var log       = logger.getLogger(filename);
 
-function APNProvider(bosh_server) {
+function APNProvider(bosh_server, options) {
 
+    var bosh_options;
+    
     this.sessions = [ ];
     this.devices = {};
 
-    this.config = {
+    var config = {
         register_path : /^\/register(\/+)?$/,
         unregister_path : /^\/unregister(\/+)?$/,
         set_badge_path : /^\/set-badge(\/+)?$/,
@@ -27,12 +30,12 @@ function APNProvider(bosh_server) {
     function http_error_handler(ex) {
         throw new Error(
             sprintf('ERROR on listener at endpoint: http://%s:%s%s',
-                options.host, options.port, options.path)
+                config.address, config.port)
         );
     }
     
     function handle_set_badge_request(req, res, u) {
-        var ppos = u.pathname.search(this.config.set_badge_path);
+        var ppos = u.pathname.search(config.set_badge_path);
         if (ppos === -1) {
             return;
         }
@@ -72,7 +75,7 @@ function APNProvider(bosh_server) {
     }
 
     function handle_register_request(req, res, u) {
-        var ppos = u.pathname.search(this.config.register_path);
+        var ppos = u.pathname.search(config.register_path);
         if (ppos === -1) {
             return;
         }
@@ -117,7 +120,7 @@ function APNProvider(bosh_server) {
     }
 
     function handle_unregister_request(req, res, u) {
-        var ppos = u.pathname.search(this.config.unregister_path);
+        var ppos = u.pathname.search(config.unregister_path);
         if (ppos === -1) {
             return;
         }
@@ -159,22 +162,30 @@ function APNProvider(bosh_server) {
 
     function handle_unhandled_request(req, res, u) {
         if (u.pathname === '/') {
-            res.write('<html>')
-            res.write('<title>APN Provider</title>')
-            res.write('<body>');
+            res.writeHead(200, bosh_options.HTTP_GET_RESPONSE_HEADERS);
+            var html = [ ];
+            html.push('<?xml version="1.0" encoding="utf-8"?>');
+            html.push('<!DOCTYPE html>');
+            html.push('<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">')
+            html.push('<title>APN Provider</title>')
+            html.push('<body>');
 
             for (var session in this.sessions) {
-                res.write('<p>');
-                res.write(JSON.stringify(this.sessions[session]));
-                res.write('</p>');
+                html.push('<p>');
+                html.push(JSON.stringify(this.sessions[session]));
+                html.push('</p>');
             }
 
-            res.write('</body>');
-            res.write('</html>');
+            html.push('</body>');
+            html.push('</html>');
+            
+            res.write(html.join('\n'));
         }
         res.end();
         return false;
     }
+    
+    bosh_options = new opt.BOSH_Options(options);
 
     bosh_server.on("response", function(stanza, stream) {
         this.response_received(stanza, stream);
@@ -203,8 +214,8 @@ function APNProvider(bosh_server) {
     var server = http.createServer(http_request_handler);
     server.on('error', http_error_handler);
 
-    var address = this.config.address;
-    var port = this.config.port;
+    var address = config.address;
+    var port = config.port;
 
     server.listen(port, address);
 

@@ -83,7 +83,7 @@ exports.start_bosh = function(options) {
         log.trace("%s Response Acknowledged: %s", session.sid, wrapped_response.rid);
 	});
 
-	var APNProvider = new apns.APNProvider(bosh_server);
+	var APNProvider = new apns.APNProvider(bosh_server, options);
 	
 	return bosh_server;
 };
