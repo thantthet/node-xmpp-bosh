@@ -279,14 +279,14 @@ APNProvider.prototype = {
                     });
                     
                     var message = {
-                        alert: body.text(),
+                        alert: stanza.attr('from') + ': ' + body.text(),
                         badge: message_count,
                         payload: {
                             from: stanza.attr('from'),
                             to: stanza.attr('to')
                         }
                     };
-                    this.pushNote(info['device-token'], stanza.attr('from') + ': ' + message);
+                    this.pushNote(info['device-token'], message);
                 }
             }
         }
