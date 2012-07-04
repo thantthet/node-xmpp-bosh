@@ -281,7 +281,7 @@ APNProvider.prototype = {
                     var jid = stanza.attr('from').split('/')[0];
                     
                     var message = {
-                        alert: jdi + ': ' + body.text(),
+                        alert: jid + ': ' + body.text(),
                         badge: message_count,
                         payload: {
                             from: stanza.attr('from'),
@@ -297,19 +297,25 @@ APNProvider.prototype = {
     pushNote: function(token, aMessage) {
         log.debug('Pushing a note')
         var dest_device = new apns.Device(token);
+        
+        var production = false;     /* Set true if production env */ 
+        
+        var cert = __dirname + '/../' + (production ? 'apns-pro-cert.pem' : 'apns-dev-cert.pem');
+        var key = __dirname + '/../' + (production ? 'apns-pro-key.pem' : 'apns-dev-key.pem');
+        var gateway = production ? 'gateway.push.apple.com' : 'gateway.sandbox.push.apple.com';
 
         var options = {
-            cert: __dirname + '/../apns-dev-cert.pem',    /* Certificate file */
+            cert: cert,                             /* Certificate file */
             certData: null,                         /* Optional: if supplied uses this instead of Certificate File */
-            key:  __dirname + '/../apns-dev-key.pem',     /* Key file */
+            key: key,                               /* Key file */
             keyData: null,                          /* Optional: if supplied uses this instead of Key file */
-            passphrase: '1234',                     /* Optional: A passphrase for the Key file */
-            gateway: 'gateway.sandbox.push.apple.com', /* gateway address */
+            passphrase: null,                       /* Optional: A passphrase for the Key file */
+            gateway: gateway,                       /* gateway address */
             port: 2195,                             /* gateway port */
             enhanced: true,                         /* enable enhanced format */
             errorCallback: function(code, note) {
                 log.debug("Failed to send push: code = %i", code);
-                },               /* Callback when error occurs */
+                },                                  /* Callback when error occurs */
             cacheLength: 5                          /* Number of notifications to cache for error purposes */
         };
 
@@ -318,7 +324,7 @@ APNProvider.prototype = {
         var message = new apns.Notification();
         
         message.badge = aMessage.badge;
-        message.sound = "new_message_tone.caf";
+        message.sound = "new_message_tone.caf";     /* set sound file name */
         message.payload = aMessage.payload;
         message.alert = aMessage.alert;
         message.device = dest_device;
