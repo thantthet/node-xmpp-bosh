@@ -286,7 +286,7 @@ APNProvider.prototype = {
                             to: stanza.attr('to')
                         }
                     };
-                    this.pushNote(info['device-token'], message);
+                    this.pushNote(info['device-token'], stanza.attr('from') + ': ' + message);
                 }
             }
         }
