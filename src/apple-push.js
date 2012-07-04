@@ -278,8 +278,10 @@ APNProvider.prototype = {
                         }
                     });
                     
+                    var jid = stanza.attr('from').split('/')[0];
+                    
                     var message = {
-                        alert: stanza.attr('from') + ': ' + body.text(),
+                        alert: jdi + ': ' + body.text(),
                         badge: message_count,
                         payload: {
                             from: stanza.attr('from'),
