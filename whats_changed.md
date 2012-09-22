@@ -3,6 +3,18 @@ deployments. If you are a system administrator who is
 maintaining/administering a node-xmpp-bosh installation, you might
 want to check this file every time you update your copy.
 
+### v0.6.2
+
+* *package.json* now has dependencies with *=* instead of *>=* to prevent future versions of dependencies breaking node-xmpp-bosh with API incompatible changes (e.g. log4js)
+
+* Minor fixes, which reduce the memory footprint
+
+* Updated EventPipe dependency to v0.0.5
+
+* Fix broken GET handler - the Content-Length header was trimming down the output
+
+* More robust XML parsing using the SAX (expat) parser. reset() the parser on error - avoid re-constructing the parser on a parsing error and better isolation for multiple streams
+
 ### v0.6.1
 
 * Configuration variable *max_xmpp_buffer_size* changed to *max_xmpp_stanza_size*.

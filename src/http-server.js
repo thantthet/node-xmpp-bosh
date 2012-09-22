@@ -44,18 +44,51 @@ function HTTPServer(port, host, stat_func, bosh_request_handler, http_error_hand
 
     function parse_request(buffers) {
         var valid_request = true;
-        for (var i = 0, len = buffers.length; i < len; i++) {
-            if (!valid_request) return null;
+
+        // We wrap every request in a <DUMMY> request
+        // </DUMMY> tag. This prevents the user from hacking
+        // the parser's stream by sending in a request like: <body>
+        // <blah/> </body> <body>
+        //
+        // If the user sent a reuqest like <body> <blah/> <DUMMY> or
+        // any such thing, then the parser will be able to detect it.
+        var i;
+        bosh_request_parser.parse('<DUMMY>');
+
+        for (i = 0; i < buffers.length; i++) {
+            // log.trace("Request fragment: %s", buffers[i]);
             valid_request = bosh_request_parser.parse(buffers[i]);
+            if (!valid_request) {
+                bosh_request_parser.reset();
+                return null;
+            }
         }
+        valid_request = bosh_request_parser.parse('</DUMMY>');
 
         if (valid_request && bosh_request_parser.parsedBody) {
-            return bosh_request_parser.parsedBody;
+            if (bosh_request_parser.parsedBody.getChild('body')) {
+                var bodyTag = bosh_request_parser.parsedBody.getChild('body');
+                bodyTag.parent = null;
+                return bodyTag;
+            } else {
+                // We don't reset the parser if we got a valid
+                // bodyTag, but didn't get a <body> child element in
+                // the <DUMMY> wrapper tag since the parser state
+                // isn't corrupted.
+                return null;
+            }
         } else {
-            bosh_request_parser = new BoshRequestParser();
+            // We reset the parser state if we either got a 'false'
+            // return from the parse() method or if the bodyTag is
+            // absent because the bodyTag could be absent due to an
+            // unclosed tag (which might occur due to malicious
+            // input). Reseting the parser state clears out the
+            // currently being processed stanza.
+            bosh_request_parser.reset();
+            return null;
         }
     }
-    
+
     // All request handlers return 'false' on successful handling
     // of the request and 'undefined' if they did NOT handle the
     // request. This is according to the EventPipe listeners API
@@ -63,15 +96,20 @@ function HTTPServer(port, host, stat_func, bosh_request_handler, http_error_hand
     function handle_get_bosh_request(req, res, u) {
         var ppos = u.pathname.search(bosh_options.path);
         if (req.method === 'GET' && ppos !== -1 && u.query.hasOwnProperty('data')) {
-            if (!bosh_request_parser.parse(u.query.data)) {
-                req.destroy();
+            res = new helper.JSONPResponseProxy(req, res);
+            res.request_headers = req.headers;
+
+            var body = parse_request([u.query.data]);
+            if (body === null) {
+                // If we got an invalid JSON, we should respond with
+                // valid XML that has an error condition.
+                res.end(helper.$terminate({
+                    condition: "bad-request",
+                    message: "Invalid XML"
+                }).toString());
             } else {
-                res = new helper.JSONPResponseProxy(req, res);
-                res.request_headers = req.headers;
-                bosh_request_handler(res, bosh_request_parser.parsedBody);
+                bosh_request_handler(res, body);
             }
-            bosh_request_parser.end();
-            bosh_request_parser = null;
             return false;
         }
     }
@@ -101,7 +139,11 @@ function HTTPServer(port, host, stat_func, bosh_request_handler, http_error_hand
                     req_parts.forEach(function (p) {
                         log.warn("XML parsing Error: %s", p);
                     });
-                    res.end("XML parsing Error");
+                    // Send back valid XML with an appropriate error code.
+                    res.end(helper.$terminate({
+                        condition: "bad-request",
+                        message: "Invalid XML"
+                    }).toString());
                 }
             }
             req_parts = null;
@@ -161,7 +203,11 @@ function HTTPServer(port, host, stat_func, bosh_request_handler, http_error_hand
     function handle_get_statistics(req, res, u) {
         var ppos = u.pathname.search(bosh_options.path);
         if (req.method === 'GET' && ppos !== -1 && !u.query.hasOwnProperty('data')) {
-            res.writeHead(200, bosh_options.HTTP_GET_RESPONSE_HEADERS);
+            var _headers = { };
+            dutil.copy(_headers, bosh_options.HTTP_GET_RESPONSE_HEADERS);
+            _headers['Content-Type'] = 'text/html; charset=utf-8';
+            res.writeHead(200, _headers);
+
             var stats = stat_func();
             res.end(stats);
             return false;

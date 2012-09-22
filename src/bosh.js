@@ -93,18 +93,13 @@ exports.createServer = function (options) {
 
     function get_statistics() {
         var stats = [ ];
-        stats.push('<?xml version="1.0" encoding="utf-8"?>');
-        stats.push('<!DOCTYPE html>');
-        var content = new ltx.Element('html', {
-            'xmlns':    'http://www.w3.org/1999/xhtml',
-            'xml:lang': 'en'
-        })
+        var content = new ltx.Element('html')
             .c('head')
             .c('title').t('node-xmpp-bosh').up()
             .up()
             .c('body')
             .c('h1')
-            .c('a', {'href': 'https://github.com/dhruvbird/node-xmpp-bosh'})
+            .c('a', {'href': 'http://dhruvbird.com/p/node-xmpp-bosh'})
             .t('node-xmpp-bosh')
             .up()
             .up()
@@ -204,8 +199,8 @@ exports.createServer = function (options) {
         // event and throw an exception if it is unhandled
         if (!bep.emit('error', ex)) {
             throw new Error(
-                sprintf('ERROR on listener at endpoint: http://%s:%s%s',
-                    options.host, options.port, options.path)
+                sprintf('ERROR (%s) on listener at endpoint: http://%s:%s%s',
+                        String(ex), options.host, options.port, options.path)
             );
         }
     }
