@@ -14,25 +14,25 @@ var log       = logger.getLogger(filename);
 
 function APNProvider(bosh_server, options) {
 
-    var bosh_options;
+    // var bosh_options;
     
     this.sessions = [ ];
     this.devices = {};
 
     var config = {
-        register_path : /^\/register(\/+)?$/,
-        unregister_path : /^\/unregister(\/+)?$/,
-        set_badge_path : /^\/set-badge(\/+)?$/,
-        port : 2020,
-        address : '0.0.0.0'
+        register_path : /^\/apn\-register(\/+)?$/,
+        unregister_path : /^\/apn\-unregister(\/+)?$/,
+        set_badge_path : /^\/set\-badge(\/+)?$/,
+        // port : options.port,
+        // address : '0.0.0.0'
     };
 
-    function http_error_handler(ex) {
-        throw new Error(
-            sprintf('ERROR on listener at endpoint: http://%s:%s%s',
-                config.address, config.port)
-        );
-    }
+    // function http_error_handler(ex) {
+    //     throw new Error(
+    //         sprintf('ERROR on listener at endpoint: http://%s:%s%s',
+    //             config.address, config.port)
+    //     );
+    // }
     
     function handle_set_badge_request(req, res, u) {
         var ppos = u.pathname.search(config.set_badge_path);
@@ -185,7 +185,7 @@ function APNProvider(bosh_server, options) {
         return false;
     }
     
-    bosh_options = new opt.BOSH_Options(options);
+    // bosh_options = new opt.BOSH_Options(options);
 
     bosh_server.on("response", function(stanza, stream) {
         this.response_received(stanza, stream);
@@ -211,15 +211,17 @@ function APNProvider(bosh_server, options) {
         router.emit('request', req, res, u);
     }
 
-    var server = http.createServer(http_request_handler);
-    server.on('error', http_error_handler);
+    bosh_server.server.on('request', http_request_handler);
 
-    var address = config.address;
-    var port = config.port;
+    // var server = http.createServer(http_request_handler);
+    // server.on('error', http_error_handler);
 
-    server.listen(port, address);
+    // var address = config.address;
+    // var port = config.port;
 
-    console.log("APNS notifier server on : http://%s:%s", address, port);
+    // server.listen(port, address);
+
+    // console.log("APNS notifier server on : http://%s:%s", address, port);
 }
 
 APNProvider.prototype = {

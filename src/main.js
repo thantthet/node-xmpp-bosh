@@ -82,8 +82,6 @@ exports.start_bosh = function(options) {
 		// What to do with this response??
         log.trace("%s Response Acknowledged: %s", session.sid, wrapped_response.rid);
 	});
-
-	var APNProvider = new apns.APNProvider(bosh_server, options);
 	
 	return bosh_server;
 };
@@ -102,3 +100,7 @@ exports.start_websocket = function(bosh_server, webSocket) {
 	var conn = new xpc.Connector(ws_server, { });
     return ws_server;
 };
+
+exports.start_apns = function(bosh_server) {
+	var APNProvider = new apns.APNProvider(bosh_server);
+}

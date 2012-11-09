@@ -114,7 +114,7 @@ function main() {
 
 	if (opts.port === -1) {
 		if (!server_options.port) {
-			server_options.port = 5280;
+			server_options.port = process.env.PORT || 5280;
 		}
 	}
 	else {
@@ -175,6 +175,7 @@ function main() {
 					   );
 
 	var ws_server   = nxb.start_websocket(bosh_server);
+	nxb.start_apns(bosh_server);
 }
 
 // Go!!
