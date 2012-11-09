@@ -136,7 +136,7 @@ function main() {
 
 	if (opts.path === -1) {
 		if (!server_options.path) {
-			server_options.path = '/http-bind/';
+			server_options.path = /^\/xmpp-http-bind(\/+)?$/;
 		}
 	}
 	else {

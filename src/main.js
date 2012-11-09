@@ -47,7 +47,7 @@ exports.dutil      = dutil;
 exports.start_bosh = function(options) {
 	options = options || { };
 	options = dutil.extend(options, {
-		path: /^\/http-bind(\/+)?$/, 
+		path: /^\/xmpp-http-bind(\/+)?$/, 
 		port: 5280, 
 		logging: "INFO"
 	});
