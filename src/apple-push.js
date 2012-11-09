@@ -202,8 +202,7 @@ function APNProvider(bosh_server, options) {
     var router = new EventPipe();
     router.on('request', handle_register_request.bind(this), 1)
         .on('request', handle_unregister_request.bind(this), 2)
-        .on('request', handle_set_badge_request.bind(this), 3)
-        .on('request', handle_unhandled_request.bind(this), 4)
+        .on('request', handle_set_badge_request.bind(this), 3);
 
     function http_request_handler(req, res) {
         var u = url.parse(req.url, true);
