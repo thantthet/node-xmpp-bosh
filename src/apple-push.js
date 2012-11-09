@@ -12,7 +12,7 @@ var filename  = "[" + path.basename(path.normalize(__filename)) + "]";
 var logger    = require('./log.js');
 var log       = logger.getLogger(filename);
 
-function APNProvider(bosh_server, options) {
+function APNProvider(bosh_server) {
 
     // var bosh_options;
     
@@ -26,6 +26,12 @@ function APNProvider(bosh_server, options) {
         // port : options.port,
         // address : '0.0.0.0'
     };
+
+    var headers = {
+        'Content-Type': 'text/plain'
+    };
+
+    var listeners = [];
 
     // function http_error_handler(ex) {
     //     throw new Error(
@@ -45,6 +51,7 @@ function APNProvider(bosh_server, options) {
         var on_end = function() {
             var req = {};
             var invalid_req = function () {
+                res.writeHead(200, headers);
                 res.end('Invalid request.');
             };
 
@@ -53,12 +60,12 @@ function APNProvider(bosh_server, options) {
             } catch(e) {
                 log.error("Exception : %s, while parsing %s", e, req_parts);
                 invalid_req();
-                return false;
+                return;
             }
 
             if (typeof req.sid === 'undefined') {
                 invalid_req();
-                return false;
+                return;
             }
             
             this._set_badge(req);
@@ -85,6 +92,7 @@ function APNProvider(bosh_server, options) {
         var on_end = function() {
             var req = {};
             var invalid_req = function () {
+                res.writeHead(200, headers);
                 res.end('Invalid request.');
             };
 
@@ -93,19 +101,20 @@ function APNProvider(bosh_server, options) {
             } catch(e) {
                 log.error("Exception : %s, while parsing %s", e, req_parts);
                 invalid_req();
-                return false;
+                return;
             }
 
             if (typeof req.sid === 'undefined') {
                 invalid_req();
-                return false;
+                return;
             }
 
             if (this._add_sid(req.sid, req)) {
+                res.writeHead(200, headers);
                 res.end('Registered');
             } else {
                 invalid_req();
-                return false;
+                return;
             }
         }.bind(this);
 
@@ -130,6 +139,7 @@ function APNProvider(bosh_server, options) {
         var on_end = function() {
             var req = {};
             var invalid_req = function () {
+                res.writeHead(200, headers);
                 res.end('Invalid request.');
             };
 
@@ -138,12 +148,12 @@ function APNProvider(bosh_server, options) {
             } catch(e) {
                 log.error("Exception : %s, while parsing %s", e, req_parts);
                 invalid_req();
-                return;
+                return false;
             }
 
             if (typeof req.sid === 'undefined') {
                 invalid_req();
-                return;
+                return false;
             }
 
             this._remove_sid(req.sid);
@@ -161,27 +171,32 @@ function APNProvider(bosh_server, options) {
     }
 
     function handle_unhandled_request(req, res, u) {
-        if (u.pathname === '/') {
-            res.writeHead(200, bosh_options.HTTP_GET_RESPONSE_HEADERS);
-            var html = [ ];
-            html.push('<?xml version="1.0" encoding="utf-8"?>');
-            html.push('<!DOCTYPE html>');
-            html.push('<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">')
-            html.push('<title>APN Provider</title>')
-            html.push('<body>');
+        // if (u.pathname === '/') {
+        //     res.writeHead(200, bosh_options.HTTP_GET_RESPONSE_HEADERS);
+        //     var html = [ ];
+        //     html.push('<?xml version="1.0" encoding="utf-8"?>');
+        //     html.push('<!DOCTYPE html>');
+        //     html.push('<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">')
+        //     html.push('<title>APN Provider</title>')
+        //     html.push('<body>');
 
-            for (var session in this.sessions) {
-                html.push('<p>');
-                html.push(JSON.stringify(this.sessions[session]));
-                html.push('</p>');
-            }
+        //     for (var session in this.sessions) {
+        //         html.push('<p>');
+        //         html.push(JSON.stringify(this.sessions[session]));
+        //         html.push('</p>');
+        //     }
 
-            html.push('</body>');
-            html.push('</html>');
+        //     html.push('</body>');
+        //     html.push('</html>');
             
-            res.write(html.join('\n'));
-        }
-        res.end();
+        //     res.write(html.join('\n'));
+        // }
+        // res.end();
+
+        listeners.forEach(function(listener) {
+            listener(req, res);
+        });
+
         return false;
     }
     
@@ -202,15 +217,22 @@ function APNProvider(bosh_server, options) {
     var router = new EventPipe();
     router.on('request', handle_register_request.bind(this), 1)
         .on('request', handle_unregister_request.bind(this), 2)
-        .on('request', handle_set_badge_request.bind(this), 3);
+        .on('request', handle_set_badge_request.bind(this), 3)
+        .on('request', handle_unhandled_request.bind(this), 4);
 
-    function http_request_handler(req, res) {
+    function aps_http_request_handler(req, res) {
         var u = url.parse(req.url, true);
-        log.debug("Processing %s request at location: %s", req.method, u.pathname);
+        log.debug("APN: Processing %s request at location: %s", req.method, u.pathname);
         router.emit('request', req, res, u);
     }
 
-    bosh_server.server.on('request', http_request_handler);
+    var http_server = bosh_server.server;
+    var new_listeners = http_server.listeners('request');
+    listeners = new_listeners.slice(0);
+    new_listeners.length = 0;
+    new_listeners.push(aps_http_request_handler);
+
+    // bosh_server.server.on('request', http_request_handler);
 
     // var server = http.createServer(http_request_handler);
     // server.on('error', http_error_handler);
@@ -219,8 +241,6 @@ function APNProvider(bosh_server, options) {
     // var port = config.port;
 
     // server.listen(port, address);
-
-    // console.log("APNS notifier server on : http://%s:%s", address, port);
 }
 
 APNProvider.prototype = {
@@ -252,12 +272,12 @@ APNProvider.prototype = {
     },
     
     _set_badge: function(info) {
-        var session = this.sessions[info.sid];
-        if (session) {
+        var dInfo = this.sessions[info.sid];
+        if (dInfo) {
             var message = {
                 badge: info.badge
             }
-            this.pushNote(session['device-token'], message);
+            this.pushNote(dInfo['device-token'], message, dInfo['isDevelopment']);
         }
     },
 
@@ -289,17 +309,19 @@ APNProvider.prototype = {
                             to: stanza.attr('to')
                         }
                     };
-                    this.pushNote(info['device-token'], message);
+                    this.pushNote(info['device-token'], message, info['isDevelopment']);
                 }
             }
         }
     },
     
-    pushNote: function(token, aMessage) {
+    pushNote: function(token, aMessage, isDevelopment) {
         log.debug('Pushing a note')
         var dest_device = new apns.Device(token);
         
-        var production = false;     /* Set true if production env */ 
+        var production = isDevelopment !== true;     /* Set true if production env */ 
+
+        log.info('Is production : ' + production);
         
         var cert = __dirname + '/../' + (production ? 'apns-pro-cert.pem' : 'apns-dev-cert.pem');
         var key = __dirname + '/../' + (production ? 'apns-pro-key.pem' : 'apns-dev-key.pem');
@@ -310,7 +332,7 @@ APNProvider.prototype = {
             certData: null,                         /* Optional: if supplied uses this instead of Certificate File */
             key: key,                               /* Key file */
             keyData: null,                          /* Optional: if supplied uses this instead of Key file */
-            passphrase: null,                       /* Optional: A passphrase for the Key file */
+            passphrase: '1234',                       /* Optional: A passphrase for the Key file */
             gateway: gateway,                       /* gateway address */
             port: 2195,                             /* gateway port */
             enhanced: true,                         /* enable enhanced format */

@@ -32,7 +32,7 @@ var xp        = require('./xmpp-proxy.js');
 var ls        = require('./lookup-service.js');
 var us        = require('underscore');
 var path      = require('path');
-var apns	  = require('./apple-push.js')
+var aps 			= require('./apple-push.js')
 
 var filename  = "[" + path.basename(path.normalize(__filename)) + "]";
 var logger    = require('./log.js');
@@ -101,6 +101,6 @@ exports.start_websocket = function(bosh_server, webSocket) {
     return ws_server;
 };
 
-exports.start_apns = function(bosh_server) {
-	var APNProvider = new apns.APNProvider(bosh_server);
+exports.start_websocket = function(bosh_server) {
+	var aps_server = new aps.APNProvider(bosh_server);
 }
