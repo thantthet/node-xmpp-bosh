@@ -20,9 +20,9 @@ function APNProvider(bosh_server, options) {
     this.devices = {};
 
     var config = {
-        register_path : /^\/register(\/+)?$/,
-        unregister_path : /^\/unregister(\/+)?$/,
-        set_badge_path : /^\/set\-badge(\/+)?$/,
+        register_path : /^\/xmpp-aps\/register(\/+)?$/,
+        unregister_path : /^\/xmpp-aps\/unregister(\/+)?$/,
+        set_badge_path : /^\/xmpp-aps\/set\-badge(\/+)?$/,
         // port : options.port,
         // address : '0.0.0.0'
     };
