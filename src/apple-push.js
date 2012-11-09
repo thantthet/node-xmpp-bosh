@@ -20,8 +20,8 @@ function APNProvider(bosh_server, options) {
     this.devices = {};
 
     var config = {
-        register_path : /^\/apn\-register(\/+)?$/,
-        unregister_path : /^\/apn\-unregister(\/+)?$/,
+        register_path : /^\/register(\/+)?$/,
+        unregister_path : /^\/unregister(\/+)?$/,
         set_badge_path : /^\/set\-badge(\/+)?$/,
         // port : options.port,
         // address : '0.0.0.0'
