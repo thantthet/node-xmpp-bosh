@@ -61,6 +61,9 @@ exports.config = {
 
     // The maximum length of an XML stanza to be printed. Set to -1
     // for unlimited line length.
-    trim_default_length: 256
+    trim_default_length: 256,
 
+    // The password used to protect the /PATH/sysinfo/ URL. The
+    // username to use when prompted for authentication is 'admin'.
+    system_info_password: ''
 };

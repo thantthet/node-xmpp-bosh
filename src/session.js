@@ -1,4 +1,4 @@
-// -*-  tab-width:4  -*-
+// -*-  tab-width:4; c-basic-offset: 4; indent-tabs-mode: nil  -*-
 
 /*
  * Copyright (c) 2011 Dhruv Matani, Anup Kalbalia
@@ -31,7 +31,7 @@ var responsejs  = require('./response.js');
 var assert      = require('assert').ok;
 var path        = require('path');
 
-var filename    = "[" + path.basename(path.normalize(__filename)) + "]";
+var filename    = path.basename(path.normalize(__filename));
 var log         = require('./log.js').getLogger(filename);
 
 var toNumber = us.toNumber;
@@ -220,9 +220,9 @@ Session.prototype = {
         }
 
         // Null out all the requests for the deleted stream.
-        us(this.queued_requests).each(function (queued_request, rid) {
+        us(this.queued_requests).each(function stream_request_deleter(queued_request, rid) {
             if (queued_request.stream === stream) {
-                log.trace("%s %s delete_stream - will not process request rid: %s", this.sid, stream.name, rid);
+                log.trace("%s %s Will not process request rid: %s", this.sid, stream.name, rid);
                 this.queued_requests[rid].node = $body();
                 this.queued_requests[rid].stream = null;
             }
@@ -300,7 +300,7 @@ Session.prototype = {
 
         // Check for stream terminate
         if (helper.is_stream_terminate_request(node)) {
-            log.info("%s Stream Terminate Request", this.sid);
+            log.debug("%s Stream Terminate Request", this.sid);
             // We may be required to terminate one stream, or all
             // the open streams on this BOSH session.
             this.handle_client_stream_terminate_request(stream, nodes,
@@ -431,7 +431,12 @@ Session.prototype = {
         if (rid < this.max_rid_sent) {
             // Always use _send_no_requeue() since it correctly
             // manipulates internal state.
-            this._send_no_requeue(ro, helper.$body());
+            var attrs = {
+                message: "rid: " + String(rid) + " is < greatest rid sent (" +
+                    String(this.max_rid_sent) + ")",
+                condition: 'item-not-found'
+            };
+            this._send_no_requeue(ro, helper.$body(attrs));
             return;
         }
 
@@ -449,7 +454,7 @@ Session.prototype = {
             var condition = 'policy-violation';
             this.send_terminate_response(ro, condition);
 
-            this.streams.forEach(function (stream) {
+            this.streams.forEach(function stream_terminator(stream) {
                 stream.terminate(condition);
             });
 
@@ -458,7 +463,7 @@ Session.prototype = {
         }
 
         ro.set_socket_options(this.wait);
-        ro.set_timeout(function () {
+        ro.set_timeout(function _on_request_timeout_callback() {
             var pos = this.res.indexOf(ro);
             if (pos === -1) {
                 return;
@@ -468,13 +473,23 @@ Session.prototype = {
             // Send back an empty body element.
             // We don't add this to unacked_responses since it's wasteful. NO
             // WE ACTUALLY DO add it to unacked_responses
-            this._send_no_requeue(ro, $body());
+            var attrs = {
+                message: 'Timed out'
+            };
+            // The invariant here is is that
+            // add_held_http_connection() shall be called *before*
+            // this.first_response is set to false for
+            // PIDGIN_COMPATIBLE mode. Only then can we rely on it
+            // being 'true' when we come here for the first time.
+            if (this._options.PIDGIN_COMPATIBLE && this.first_response) {
+                attrs.sid = this.sid;
+            }
+            this._send_no_requeue(ro, $body(attrs));
         }.bind(this), this.wait * 1000);
 
         // Insert into its correct position (in RID order)
         var pos;
-        for (pos = 0; pos < this.res.length && this.res[pos].rid < ro.rid; ++pos) {
-        }
+        for (pos = 0; pos < this.res.length && this.res[pos].rid < ro.rid; ++pos) { }
         this.res.splice(pos, 0, ro);
 
         log.trace("%s add_held_http_connection - now holding %s res obj", this.sid, this.res.length);
@@ -494,8 +509,12 @@ Session.prototype = {
         // We use get_response_object() since it also calls clearTimeout, etc...
         // for us for free.
         var ro = this.get_response_object();
+        var attrs = {
+            message: 'Cleanup due to session termination'
+        };
+
         while (ro) {
-            this._send_no_requeue(ro, helper.$body());
+            this._send_no_requeue(ro, helper.$body(attrs));
             ro = this.get_response_object();
         }
 
@@ -524,8 +543,8 @@ Session.prototype = {
         log.trace("%s reset_inactivity_timeout - %s sec", this.sid, this.inactivity + 10);
 
         var self = this;
-        this.timeout = setTimeout(function () {
-            log.info("%s terminating Session due to inactivity", self.sid);
+        this.timeout = setTimeout(function _on_session_inactivity_timeout_callback() {
+            log.info("%s Terminating Session due to inactivity", self.sid);
             // Raise a no-client event on pending, unstitched as well as unacked 
             // responses.
             var _p = us.pluck(self.pending_stitched_responses, 'response');
@@ -582,7 +601,7 @@ Session.prototype = {
     // send to the client as to why the session was closed.
     // 
     send_terminate_response: function (ro, condition) {
-        log.info("%s send_terminate_response - ro: %s, condition: %s", this.sid, !!ro, condition || "no-condition");
+        log.debug("%s send_terminate_response - ro: %s, condition: %s", this.sid, !!ro, condition || "no-condition");
         var attrs = { };
         if (condition) {
             attrs.condition = condition;
@@ -772,9 +791,9 @@ Session.prototype = {
     // the current implementation.
     //
     send_pending_responses: function () {
-        log.trace("%s send_pending_responses - pending.length: %s, Holding %d response objects", 
+        log.trace("%s pending.length: %s, Holding %s response objects", 
                   this.sid, this.pending_stitched_responses.length, this.res.length);
-        
+
         while (true) {
             if (this.res.length === 0) {
                 // dont stitch responses as well.
@@ -839,7 +858,7 @@ Session.prototype = {
      */
 
     enqueue_bosh_response: function (attrs, stream) {
-        log.trace("%s %s enqueue_bosh_response", this.sid, stream.name);
+        log.trace("%s %s", this.sid, stream.name);
         this.pending_bosh_responses[stream.name].push(attrs);
 
         if (this._options.PIDGIN_COMPATIBLE && this.first_response) {
@@ -850,7 +869,7 @@ Session.prototype = {
     },
 
     enqueue_stanza: function (stanza, stream) {
-        log.trace("%s %s enqueue_stanza", this.sid, stream.name);
+        log.trace("%s %s", this.sid, stream.name);
         this.pending_stanzas[stream.name].push(stanza);
         this.try_sending();
     },
@@ -871,12 +890,12 @@ Session.prototype = {
 
     // Send a response, but do NOT requeue if it fails
     _send_no_requeue: function (ro, msg) {
-        log.trace("%s _send_no_requeue::ro: %s", this.sid, !!ro);
+        log.trace("%s ro: %s", this.sid, !!ro);
         if (us.isFalsy(ro)) {
             return;
         }
 
-        log.trace("%s _send_no_requeue::ro.rid: %s, this.rid: %s", this.sid, ro.rid, this.rid);
+        log.trace("%s ro.rid: %s, this.rid: %s", this.sid, ro.rid, this.rid);
 
         var ack = this._get_highest_rid_to_ack(ro.rid);
 
@@ -922,10 +941,17 @@ Session.prototype = {
     // If the client has made more than "hold" connections
     // to us, then we relinquish the rest of the connections
     respond_to_extra_held_response_objects: function () {
+        if (this.res.length <= this.hold) {
+            return;
+        }
+
+        var attrs = {
+            message: 'Exceeded ' + String(this.hold) + ' held response objects'
+        };
         while (this.res.length > this.hold) {
             log.trace("%s respond_ex_held_ro - res.length: %s, hold: %s", this.sid, this.res.length, this.hold);
             var ro = this.get_response_object();
-            this._send_no_requeue(ro, $body());
+            this._send_no_requeue(ro, $body(attrs));
         }
     },
 
@@ -936,7 +962,7 @@ Session.prototype = {
      */
     _get_random_stream: function () {
         if (this.streams.length === 0) {
-            log.error("%s get_random_stream - session has no streams", this.sid);
+            log.error("%s session has no streams", this.sid);
             return null;
         }
         var stream = this.streams[0];
@@ -948,7 +974,7 @@ Session.prototype = {
      * not in sequence.
      */
     _send_immediate: function (res, response_obj) {
-        log.trace("%s send_immediate - ro: %s", this.sid, !!response_obj);
+        log.trace("%s ro: %s", this.sid, !!response_obj);
         var ro = new responsejs.Response(res, null, this.sid, this._options);
         ro.send_response(response_obj.toString());
     },
@@ -986,16 +1012,16 @@ Session.prototype = {
         // If the request from the client includes an ACK, we delete all
         // packets with an 'rid' less than or equal to this value since
         // the client has seen all those packets.
-        _uar_keys.forEach(function (rid) {
+        _uar_keys.forEach(function purge_acknowledged_responses(rid) {
             if (rid <= node.attrs.ack) {
                 // Raise the 'response-acknowledged' event.
-                log.trace("%s handle_acks - received ack: %s", this.sid, rid);
+                log.trace("%s received ack: %s", this.sid, rid);
                 this._bep.emit('response-acknowledged',
                                this.unacked_responses[rid], this);
                 delete this.unacked_responses[rid];
             }
         }.bind(this));
-	},
+    },
 
     // Precondition: This function should be called before handle_acks
     // since handle_acks deletes all unacked_reponses upto node.attrs.ack
@@ -1010,13 +1036,13 @@ Session.prototype = {
             var _ts = this.unacked_responses[node.attrs.ack].ts;
             var stream = this._get_random_stream();
             if (!stream) {
-                log.error("%s enqueue_report_if_reqd - couldnt get random stream", this.sid);
+                log.error("%s Couldn't get random stream", this.sid);
             } else {
                 // We inject a response packet into the pending queue to
                 // notify the client that it _may_ have missed something.
                 // TODO: we should also have a check which ensures that 
                 // time > RTT has passed. 
-                log.trace("%s enqueue_report_if_reqd - sending report - max_rid_sent: %s, node.attrs.ack: %s", 
+                log.trace("%s Sending report - max_rid_sent: %s, node.attrs.ack: %s", 
                           this.sid, this.max_rid_sent, node.attrs.ack);
                 this.enqueue_bosh_response({
                     report: node.attrs.ack + 1,
@@ -1024,7 +1050,7 @@ Session.prototype = {
                 }, stream);
             }
         }
-	},
+    },
 
     // handle_broken_connections uses the response object "res" to
     // send response to the client in case of abnormal conditions
@@ -1057,7 +1083,7 @@ Session.prototype = {
         // A. No idea - will need to think about it. However, a
         // standard for loop seems more readable here.
         // 
-        _queued_request_keys.forEach(function (rid) {
+        _queued_request_keys.forEach(function _handle_broken_queued_requests(rid) {
             // There should be exactly 1 'rid' in state.queued_requests
             // that is less than state.rid + 1. -- such requests are
             // immediately returned (processed and deleted by this 
@@ -1066,14 +1092,14 @@ Session.prototype = {
             if (rid < self.rid + 1) {
                 assert(rid === node.attrs.rid);
 
-                log.trace("%s handle_broken_connections - queued_req.rid: %s, state.rid: %s", self.sid, rid, self.rid);
+                log.trace("%s queued_req::rid: %s, state.rid: %s", self.sid, rid, self.rid);
                 delete self.queued_requests[rid];
                 is_broken = true;
                 if (self.unacked_responses.hasOwnProperty(rid)) {
                     //
                     // Send back the original response on this conection itself
                     //
-                    log.trace("%s handle_broken_connections - resending unacked response: %s", self.sid, rid);
+                    log.trace("%s Resending unacked response: %s", self.sid, rid);
                     self._send_immediate(res, self.unacked_responses[rid].response);
                 } else if (rid >= self.rid - self.window - 2) {
                     //
@@ -1085,7 +1111,7 @@ Session.prototype = {
                     // body the second time around. The client is to be blamed for its
                     // stupidity and not us.
                     //
-                    log.trace("%s handle_broken_connections sending empty body for rid(out of range): %s", self.sid, rid);
+                    log.trace("%s Sending empty body for rid(out of range): %s", self.sid, rid);
                     self._send_immediate(res, $body());
 
                 } else {
@@ -1099,7 +1125,7 @@ Session.prototype = {
                     //
                     // Note: Control DOES reach here. We need to figure out WHY.
                     //
-                    log.error("%s handle_broken_connections - terminating due to out of bound rid: %s, session.rid: %s", self.sid, rid, self.rid);
+                    log.error("%s Terminating due to out of bound rid: %s, session.rid: %s", self.sid, rid, self.rid);
                     dutil.copy(node.attrs, { //TODO: Might be moved to helper.
                         type: 'terminate',
                         condition: 'item-not-found',

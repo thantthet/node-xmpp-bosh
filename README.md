@@ -17,7 +17,7 @@ to see the major changes in releases.
 ```
 $ bosh-server
 ```
-The BOSH is now available at: [http://localhost:5280/http-bind/](http://localhost:5280/http-bind/)
+The BOSH service is now available at: [http://localhost:5280/http-bind/](http://localhost:5280/http-bind/)
 
 2. For options, type:
 ```
@@ -52,7 +52,8 @@ $ bosh-server --help
 * HTTP POST & GET (for older browsers) are suported (see below for more details)
 * A websocket server on the same port as the BOSH server
 * Benchmarks: https://github.com/dhruvbird/node-xmpp-bosh/wiki/Benchmarks
-* Monitor the BOSH server [http://localhost:5280/](http://localhost:5280/) (available only if you have node-xmpp-bosh running on your system)
+* Monitor the BOSH server at [http://localhost:5280/http-bind/](http://localhost:5280/http-bind/) (available only if you have node-xmpp-bosh running on your system)
+* Get detailed information about the running service at [http://localhost:5280/http-bind/sysinfo/](http://localhost:5280/http-bind/sysinfo/) (available only if you have node-xmpp-bosh running on your system)
 
 
 ### Features not Planned
@@ -102,6 +103,7 @@ Note: The **=** sign is important here. Replacing the equal sign with a space wi
 
 * **trim_default_length**: The maximum length of an XML stanza to be printed. Set to -1 for unlimited line length. **(default: 256)**
 
+* **system_info_password**: The password used to protect the /PATH/sysinfo/ URL. The username to use when prompted for authentication is 'admin' **(default: [not set])**
 
 ### Architecture
 
@@ -110,7 +112,7 @@ The project itself is divided into 4 main components as of now.
 1. A BOSH front end (bosh.js). This starts and HTTP server and manages
 the BOSH sessions and XMPP streams on those sessions. Multiple
 Streams, message acks, etc... and handled by this component. This is
-an EventPipe.
+an [EventPipe](https://github.com/dhruvbird/eventpipe).
 
 2. An XMPP (Jabber) Proxy that is responsible for making single client
 connections to an XMPP server (xmpp-proxy.js). STARTTLS and any other
@@ -119,7 +121,8 @@ replaced with any other proxy component (such as 0MQ) that connects to
 the backend server using any custom protocol. You could in theory
 write a Yahoo! Proxy that presents XMPP compliant XML stanzas to its
 users but makes HTTP REST calls to communicate with the Yahoo! chat
-servers.  This is an EventEmitter.
+servers.  This is an
+[EventEmitter](http://nodejs.org/api/events.html).
 
 3. An endpoint lookup service (lookup-service.js) that implements
 rules for XMPP service endpoint discovery. This currently encodes
@@ -244,7 +247,8 @@ if the *callback=* GET query parameter is supplied.
 * [dns-srv] (https://github.com/dhruvbird/dns-srv)
 * [semver] (https://github.com/isaacs/node-semver)
 * [ws] (https://github.com/einaros/ws)
-* [log4js] (http://log4js.berlios.de/)
+* [node-lumberjack] (https://github.com/dhruvbird/node-lumberjack)
+* [ejs] (https://github.com/visionmedia/ejs)
 * [jsdom] (https://github.com/tmpvar/jsdom) for tests
 * [jslint] (https://github.com/reid/node-jslint) for running lintit.sh
 

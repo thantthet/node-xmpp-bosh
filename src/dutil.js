@@ -27,7 +27,7 @@ var us       = require('underscore');
 var path     = require('path');
 var assert   = require('assert').ok;
 
-var filename = "[" + path.basename(path.normalize(__filename)) + "]";
+var filename = path.basename(path.normalize(__filename));
 var log      = require('./log.js').getLogger(filename);
 
 // The maximum number of characters that a single log line can contain
@@ -352,11 +352,13 @@ function time_diff(past, present) {
 }
 
 function ends_with(haystack, needle) {
-	/* Checks whether the string needle ends with the string
-	 * haystack
+	/* Checks whether the string haystack ends with the string
+	 * needle
 	 *
 	 */
-	return haystack.search(needle) !== -1;
+	return (needle.length <= haystack.length ?
+            haystack.substring(haystack.length - needle.length) === needle :
+            false);
 }
 
 function find_module(file_name) {
@@ -373,7 +375,7 @@ function find_module(file_name) {
 	var mname;
 	for (mname in require.cache) {
 		if (require.cache.hasOwnProperty(mname)) {
-			if (ends_with(mname, file_name)) {
+			if (ends_with(mname, "/" + file_name)) {
 				mhandle.handle = require.cache[mname].exports;
 				mhandle.key    = mname;
 				break;
